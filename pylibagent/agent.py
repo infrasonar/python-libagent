@@ -4,7 +4,7 @@ import logging
 import os
 import signal
 import socket
-from typing import Iterable
+from typing import Iterable, Optional
 from aiohttp import ClientSession
 from setproctitle import setproctitle
 from .logger import setup_logger
@@ -45,7 +45,6 @@ class Agent:
             logging.error('missing environment variable `TOKEN`')
             exit(1)
 
-        self._checks = checks
         self._get_headers = {'Authorization': f'Bearer {token}'}
         self._post_headers = {'Content-Type': 'application/json'}
         self._post_headers.update(self._get_headers)
