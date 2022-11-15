@@ -2,11 +2,11 @@
 locan installation: pip install -e .
 
 python setup.py sdist
-twine upload --repository pypitest dist/libprobe-x.x.x.tar.gz
-twine upload --repository pypi dist/libprobe-x.x.x.tar.gz
+twine upload --repository pypitest dist/pylibagent-x.x.x.tar.gz
+twine upload --repository pypi dist/pylibagent-x.x.x.tar.gz
 """
 from setuptools import setup, find_packages
-from libprobe.version import __version__ as version
+from pylibagent.version import __version__ as version
 
 try:
     with open('README.md', 'r') as f:
@@ -32,8 +32,8 @@ setup(
     url='https://github.com/infrasonar/python-libagent',
     download_url=(
         'https://github.com/infrasonar/'
-        'python-libprobe/tarball/v{}'.format(version)),
-    keywords=['monitoring', 'infrasonar', 'probe'],
+        'python-libagent/tarball/v{}'.format(version)),
+    keywords=['monitoring', 'infrasonar', 'agent'],
     install_requires=install_requires,
     classifiers=[
         'Intended Audience :: Developers',
