@@ -15,6 +15,7 @@ except IOError:
     long_description = ''
 
 install_requires = [
+    'aiohttp',
     'colorlog',
     'msgpack',
     'setproctitle',

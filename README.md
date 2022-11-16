@@ -5,6 +5,12 @@
 
 This library is created for building [InfraSonar](https://infrasonar.com) agents.
 
+## Installation
+
+```
+pip install pylibagent
+```
+
 ## Environment variables
 
 Variable                    | Default                       | Description
