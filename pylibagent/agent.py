@@ -70,7 +70,7 @@ class Agent:
         exists) and if not given, the fqdn is used."""
         try:
             if self.asset_id is None:
-                self.asset_id = await self._create_asset()
+                self.asset_id, name = await self._create_asset()
                 self._dump_json()
                 logging.info(f'created agent {name} (Id: {self.asset_id})')
                 return
@@ -164,7 +164,7 @@ class Agent:
     async def _start(self, checks: Iterable[CheckBase],
                      asset_name: Optional[str] = None):
         await self.announce(asset_name)
-        checks = [self._check_loop(c) for c in self._checks.values()]
+        checks = [self._check_loop(c) for c in checks.values()]
         await asyncio.wait(checks)
 
     async def _check_loop(self, check):
@@ -204,16 +204,20 @@ class Agent:
                 resp = await r.json()
                 asset_id = resp['assetId']
 
-        url = os.path.join(
-            self.api_uri,
-            f'asset/{asset_id}/collector/{self.key}')
-        async with ClientSession(headers=self._post_headers) as session:
-            async with session.post(url, ssl=self.verify_ssl) as r:
-                if r.status != 204:
-                    msg = await r.text()
-                    raise Exception(f'{msg} (error code: {r.status})')
+        try:
+            url = os.path.join(
+                self.api_uri,
+                f'asset/{asset_id}/collector/{self.key}')
+            async with ClientSession(headers=self._post_headers) as session:
+                async with session.post(url, ssl=self.verify_ssl) as r:
+                    if r.status != 204:
+                        msg = await r.text()
+                        raise Exception(f'{msg} (error code: {r.status})')
+        except Exception as e:
+            msg = str(e) or type(e).__name__
+            logging.error(f'failed to assign collector: {msg}')
 
-        return asset_id
+        return asset_id, name
 
     def _read_json(self):
         if not os.path.exists(self.asset_id_file):
