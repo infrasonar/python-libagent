@@ -195,6 +195,15 @@ class Agent:
                 resp = await r.json()
                 asset_id = resp['assetId']
 
+        url = os.path.join(
+            self.api_uri,
+            f'asset/{asset_id}/collector/{self.key}')
+        async with ClientSession(headers=self._post_headers) as session:
+            async with session.post(url, ssl=self.verify_ssl) as r:
+                if r.status != 204:
+                    msg = await r.text()
+                    raise Exception(f'{msg} (error code: {r.status})')
+
         return asset_id
 
     def _read_json(self):
