@@ -164,7 +164,7 @@ class Agent:
     async def _start(self, checks: Iterable[CheckBase],
                      asset_name: Optional[str] = None):
         await self.announce(asset_name)
-        checks = [self._check_loop(c) for c in checks.values()]
+        checks = [self._check_loop(c) for c in checks]
         await asyncio.wait(checks)
 
     async def _check_loop(self, check):
