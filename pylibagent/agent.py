@@ -153,14 +153,15 @@ class Agent:
         try:
             asyncio.run(self._start(checks, asset_name))
         except asyncio.exceptions.CancelledError:
-            pass
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            loop.close()
 
     def _stop(self, signame, *args):
         logging.warning(
             f'signal \'{signame}\' received, stop {self.key} agent')
         for task in asyncio.all_tasks():
             task.cancel()
-        asyncio.get_event_loop().stop()
 
     async def _start(self, checks: Iterable[CheckBase],
                      asset_name: Optional[str] = None):
