@@ -2,9 +2,10 @@ import asyncio
 import json
 import logging
 import os
+import re
 import signal
 import socket
-import re
+import time
 from typing import Iterable, Optional
 from aiohttp import ClientSession
 from setproctitle import setproctitle
@@ -113,15 +114,14 @@ class Agent:
         data = {
             "version": self.version,
             "data": data,
+            "timestamp": timestamp,
         }
 
-        if timestamp is not None:
-            data["timestamp"] = timestamp
         if runtime is not None:
             data["runtime"] = runtime
 
         try:
-            async with ClientSession(headers=headers) as session:
+            async with ClientSession(headers=self._post_headers) as session:
                 async with session.post(
                     url,
                     json=data,
@@ -134,7 +134,8 @@ class Agent:
         except Exception as e:
             msg = str(e) or type(e).__name__
             logging.error(
-               f'failed to send data: {msg} (url: {url})')
+               'failed to send data for '
+               f'check {check_key}: {msg} (url: {url})')
 
     def start(self, checks: Iterable[CheckBase],
               asset_name: Optional[str] = None):
@@ -165,7 +166,10 @@ class Agent:
                      asset_name: Optional[str] = None):
         await self.announce(asset_name)
         checks = [self._check_loop(c) for c in checks]
-        await asyncio.wait(checks)
+        try:
+            await asyncio.wait(checks)
+        except asyncio.exceptions.CancelledError:
+            pass
 
     async def _check_loop(self, check):
         while True:
