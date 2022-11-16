@@ -4,6 +4,7 @@ import logging
 import os
 import signal
 import socket
+import re
 from typing import Iterable, Optional
 from aiohttp import ClientSession
 from setproctitle import setproctitle
@@ -26,6 +27,11 @@ def _fqdn():
     return fqdn
 
 
+def _is_valid_version(version):
+    check = re.compile(r'^\d+(\.\d+(\.\d+)?)?(\-[a-zA-Z0-9_-]+)?$')
+    return isinstance(version, str) and bool(check.match(version))
+
+
 class Agent:
 
     def __init__(self, key: str, version: str):
@@ -33,7 +39,10 @@ class Agent:
         setup_logger()
 
         self.key: str = key
-        self.version = version
+        self.version: str = version
+        if not _is_valid_version(version):
+            logging.error(f'invalid agent version: `{version}`')
+            exit(1)
 
         self.asset_id_file: str = os.getenv('ASSET_ID_FILE', None)
         if self.asset_id_file is None:
