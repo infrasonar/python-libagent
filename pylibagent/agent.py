@@ -96,9 +96,9 @@ class Agent:
         # why-doesnt-os-path-join-work-in-this-case
         url = os.path.join(
             self.api_uri,
-            f'asset/{self.asset_id}/'
-            f'collector/{self.key}/'
-            f'check/{check_key}/data')
+            f'asset/{self.asset_id}',
+            f'collector/{self.key}',
+            f'check/{check_key}')
 
         timestamp = timestamp or int(time.time())
         data = {
