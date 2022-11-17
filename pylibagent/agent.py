@@ -28,6 +28,10 @@ def _fqdn():
     return fqdn
 
 
+def _join(*parts):
+    return '/'.join((part.strip('/') for part in parts))
+
+
 def _is_valid_version(version):
     check = re.compile(r'^\d+(\.\d+(\.\d+)?)?(\-[a-zA-Z0-9_-]+)?$')
     return isinstance(version, str) and bool(check.match(version))
@@ -71,12 +75,12 @@ class Agent:
         exists) and if not given, the fqdn is used."""
         try:
             if self.asset_id is None:
-                self.asset_id, name = await self._create_asset()
+                self.asset_id, name = await self._create_asset(asset_name)
                 self._dump_json()
                 logging.info(f'created agent {name} (Id: {self.asset_id})')
                 return
 
-            url = os.path.join(self.api_uri, f'asset/{self.asset_id}')
+            url = _join(self.api_uri, f'asset/{self.asset_id}')
             async with ClientSession(headers=self._get_headers) as session:
                 async with session.get(
                         url,
@@ -93,7 +97,7 @@ class Agent:
 
         except Exception as e:
             msg = str(e) or type(e).__name__
-            logging.error(f'announce failed: {msg}')
+            logging.exception(f'announce failed: {msg}')
             exit(1)
 
     async def send_data(self, check_key: str, data: dict,
@@ -104,7 +108,7 @@ class Agent:
         # before them is discarded.
         # https://stackoverflow.com/questions/1945920/
         # why-doesnt-os-path-join-work-in-this-case
-        url = os.path.join(
+        url = _join(
             self.api_uri,
             f'asset/{self.asset_id}',
             f'collector/{self.key}',
@@ -187,7 +191,7 @@ class Agent:
                     await asyncio.sleep(1)
 
     async def _create_asset(self, asset_name: Optional[str] = None) -> int:
-        url = os.path.join(self.api_uri, 'container/id')
+        url = _join(self.api_uri, 'container/id')
         async with ClientSession(headers=self._get_headers) as session:
             async with session.get(url, ssl=self.verify_ssl) as r:
                 if r.status != 200:
@@ -197,7 +201,7 @@ class Agent:
                 resp = await r.json()
                 container_id = resp['containerId']
 
-        url = os.path.join(self.api_uri, f'container/{container_id}/asset')
+        url = _join(self.api_uri, f'container/{container_id}/asset')
         name = _fqdn() if asset_name is None else asset_name
         data = {"name": name}
         async with ClientSession(headers=self._post_headers) as session:
@@ -210,9 +214,7 @@ class Agent:
                 asset_id = resp['assetId']
 
         try:
-            url = os.path.join(
-                self.api_uri,
-                f'asset/{asset_id}/collector/{self.key}')
+            url = _join(self.api_uri, f'asset/{asset_id}/collector/{self.key}')
             async with ClientSession(headers=self._post_headers) as session:
                 async with session.post(url, ssl=self.verify_ssl) as r:
                     if r.status != 204:
