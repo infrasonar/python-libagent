@@ -59,6 +59,7 @@ class Agent:
             logging.error('missing environment variable `TOKEN`')
             exit(1)
 
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._get_headers = {'Authorization': f'Bearer {token}'}
         self._post_headers = {'Content-Type': 'application/json'}
         self._post_headers.update(self._get_headers)
@@ -97,7 +98,7 @@ class Agent:
 
         except Exception as e:
             msg = str(e) or type(e).__name__
-            logging.exception(f'announce failed: {msg}')
+            logging.error(f'announce failed: {msg}')
             exit(1)
 
     async def send_data(self, check_key: str, data: dict,
@@ -154,12 +155,12 @@ class Agent:
         signal.signal(signal.SIGINT, self._stop)
         signal.signal(signal.SIGTERM, self._stop)
 
+        self._loop = asyncio.get_event_loop()
         try:
-            asyncio.run(self._start(checks, asset_name))
+            self._loop.run_until_complete(self._start(checks, asset_name))
         except asyncio.exceptions.CancelledError:
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(loop.shutdown_asyncgens())
-            loop.close()
+            self._loop.run_until_complete(self._loop.shutdown_asyncgens())
+            self._loop.close()
 
     def _stop(self, signame, *args):
         logging.warning(
