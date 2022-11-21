@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import re
 import signal
 import socket
@@ -42,6 +43,7 @@ class Agent:
     def __init__(self, key: str, version: str):
         setproctitle(f'{key}-agent')
         setup_logger()
+        logging.warning(f'starting {key} agent v{version}')
 
         self.key: str = key
         self.version: str = version
@@ -158,7 +160,7 @@ class Agent:
         self._loop = asyncio.get_event_loop()
         try:
             self._loop.run_until_complete(self._start(checks, asset_name))
-        except asyncio.exceptions.CancelledError:
+        except Exception:
             self._loop.run_until_complete(self._loop.shutdown_asyncgens())
             self._loop.close()
 
@@ -178,18 +180,40 @@ class Agent:
             pass
 
     async def _check_loop(self, check):
+        ts = time.time()
+        ts_next = int(ts + random.random() * check.interval) + 1
+        timeout = check.interval * 0.8
+
         while True:
+            if ts > ts_next:
+                # This can happen when a computer clock has been changed
+                logging.error('scheduled timestamp in the past; '
+                              'maybe the computer clock has been changed?')
+                ts_next = ts
+
             try:
-                check_data = await check.run()
+                wait = int(ts_next - ts)
+                for _ in range(wait):
+                    await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                logging.info(f'cancelled check: {check.key}')
+                break
+            ts = ts_next
+
+            try:
+                check_data = \
+                    await asyncio.wait_for(check.run(), timeout=timeout)
                 await self.send_data(check.key, check_data)
+            except asyncio.TimeoutError:
+                logging.error(f'check error ({check.key}): timed out')
             except Exception as e:
                 msg = str(e) or type(e).__name__
                 logging.error(f'check error ({check.key}): {msg}')
             else:
                 logging.debug(f'check_loop ({check.key}): ok!')
             finally:
-                for _ in range(check.interval):
-                    await asyncio.sleep(1)
+                ts = time.time()
+                ts_next += check.interval
 
     async def _create_asset(self, asset_name: Optional[str] = None) -> int:
         url = _join(self.api_uri, 'container/id')
