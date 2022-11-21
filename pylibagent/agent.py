@@ -209,11 +209,11 @@ class Agent:
                 await self.send_data(check.key, check_data)
             except asyncio.TimeoutError:
                 logging.error(f'check error ({check.key}): timed out')
+            except SendDataException as e:
+                logging.error(str(e))
             except Exception as e:
                 msg = str(e) or type(e).__name__
                 logging.error(f'check error ({check.key}): {msg}')
-            except SendDataException as e:
-                logging.error(str(e))
             else:
                 logging.debug(f'check_loop ({check.key}): ok!')
             finally:
