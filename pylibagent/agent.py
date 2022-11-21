@@ -14,6 +14,10 @@ from .logger import setup_logger
 from .check import CheckBase
 
 
+class SendDataException(Exception):
+    pass
+
+
 def _convert_verify_ssl(val):
     if val is None or val.lower() in ['true', '1', 'y', 'yes']:
         return None  # None for default SSL check
@@ -140,9 +144,8 @@ class Agent:
 
         except Exception as e:
             msg = str(e) or type(e).__name__
-            logging.error(
-               'failed to send data for '
-               f'check {check_key}: {msg} (url: {url})')
+            raise SendDataException(
+                f'failed to send data ({check_key}): {msg} (url: {url})')
 
     def start(self, checks: Iterable[CheckBase],
               asset_name: Optional[str] = None):
@@ -209,6 +212,8 @@ class Agent:
             except Exception as e:
                 msg = str(e) or type(e).__name__
                 logging.error(f'check error ({check.key}): {msg}')
+            except SendDataException as e:
+                logging.error(str(e))
             else:
                 logging.debug(f'check_loop ({check.key}): ok!')
             finally:
