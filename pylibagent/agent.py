@@ -155,7 +155,11 @@ class Agent:
         """Start the agent demonized.
 
         The `asset_name` argument is only used on the accounce when the asset
-        is new and must be created. If not given, the fwdn is used.
+        is new and must be created. If not given, the fqdn is used.
+
+        The `asset_kind` argument is only used on the accounce when the asset
+        is new and must be created. If not given, the asset will be created
+        with the default `Asset` kind.
 
         Argument `checks` must be an iterable containing subclasses of
         CheckBase. (the classes, not instances of the class)
