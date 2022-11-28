@@ -270,7 +270,7 @@ class Agent:
                 url = _join(self.api_uri, f'asset/{asset_id}/kind')
                 async with ClientSession(
                         headers=self._json_headers) as session:
-                    async with sess.patch(url,
+                    async with session.patch(url,
                                           json=data,
                                           ssl=self.verify_ssl) as r:
                         if r.status != 204:
