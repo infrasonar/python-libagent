@@ -150,7 +150,8 @@ class Agent:
                 f'failed to send data ({check_key}): {msg} (url: {url})')
 
     def start(self, checks: Iterable[CheckBase],
-              asset_name: Optional[str] = None):
+              asset_name: Optional[str] = None,
+              asset_kind: Optional[str] = None):
         """Start the agent demonized.
 
         The `asset_name` argument is only used on the accounce when the asset
@@ -164,7 +165,8 @@ class Agent:
 
         self._loop = asyncio.get_event_loop()
         try:
-            self._loop.run_until_complete(self._start(checks, asset_name))
+            self._loop.run_until_complete(
+                self._start(checks, asset_name, asset_kind))
         except Exception:
             self._loop.run_until_complete(self._loop.shutdown_asyncgens())
             self._loop.close()
@@ -176,8 +178,9 @@ class Agent:
             task.cancel()
 
     async def _start(self, checks: Iterable[CheckBase],
-                     asset_name: Optional[str] = None):
-        await self.announce(asset_name)
+                     asset_name: Optional[str] = None,
+                     asset_kind: Optional[str] = None):
+        await self.announce(asset_name, asset_kind)
         checks = [self._check_loop(c) for c in checks]
         try:
             await asyncio.wait(checks)
