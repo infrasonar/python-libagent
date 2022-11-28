@@ -67,22 +67,24 @@ class Agent:
 
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._get_headers = {'Authorization': f'Bearer {token}'}
-        self._post_headers = {'Content-Type': 'application/json'}
-        self._post_headers.update(self._get_headers)
+        self._json_headers = {'Content-Type': 'application/json'}
+        self._json_headers.update(self._get_headers)
 
         self.asset_id: Optional[int] = None
         self.api_uri: str = os.getenv('API_URI', 'https://api.infrasonar.com')
         self.verify_ssl = _convert_verify_ssl(os.getenv('VERIFY_SSL', '1'))
         self._read_json()
 
-    async def announce(self, asset_name: Optional[str] = None):
+    async def announce(self, asset_name: Optional[str] = None,
+                       asset_kind: Optional[str] = None):
         """Announce the agent.
 
         Argument `asset_name` is only used if the agent is new (no asset Id
         exists) and if not given, the fqdn is used."""
         try:
             if self.asset_id is None:
-                self.asset_id, name = await self._create_asset(asset_name)
+                self.asset_id, name =\
+                     await self._create_asset(asset_name, asset_kind)
                 self._dump_json()
                 logging.info(f'created agent {name} (Id: {self.asset_id})')
                 return
@@ -132,7 +134,7 @@ class Agent:
             data["runtime"] = runtime
 
         try:
-            async with ClientSession(headers=self._post_headers) as session:
+            async with ClientSession(headers=self._json_headers) as session:
                 async with session.post(
                     url,
                     json=data,
@@ -220,7 +222,8 @@ class Agent:
                 ts = time.time()
                 ts_next += check.interval
 
-    async def _create_asset(self, asset_name: Optional[str] = None) -> int:
+    async def _create_asset(self, asset_name: Optional[str] = None,
+                            asset_kind: Optional[str] = None) -> int:
         url = _join(self.api_uri, 'container/id')
         async with ClientSession(headers=self._get_headers) as session:
             async with session.get(url, ssl=self.verify_ssl) as r:
@@ -234,7 +237,7 @@ class Agent:
         url = _join(self.api_uri, f'container/{container_id}/asset')
         name = _fqdn() if asset_name is None else asset_name
         data = {"name": name}
-        async with ClientSession(headers=self._post_headers) as session:
+        async with ClientSession(headers=self._json_headers) as session:
             async with session.post(url, json=data, ssl=self.verify_ssl) as r:
                 if r.status != 201:
                     msg = await r.text()
@@ -245,7 +248,7 @@ class Agent:
 
         try:
             url = _join(self.api_uri, f'asset/{asset_id}/collector/{self.key}')
-            async with ClientSession(headers=self._post_headers) as session:
+            async with ClientSession(headers=self._json_headers) as session:
                 async with session.post(url, ssl=self.verify_ssl) as r:
                     if r.status != 204:
                         msg = await r.text()
@@ -253,6 +256,22 @@ class Agent:
         except Exception as e:
             msg = str(e) or type(e).__name__
             logging.error(f'failed to assign collector: {msg}')
+
+        if asset_kind:
+            data = {"kind": asset_kind}
+            try:
+                url = _join(self.api_uri, f'asset/{asset_id}/kind')
+                async with ClientSession(
+                        headers=self._json_headers) as session:
+                    async with sess.patch(url,
+                                          json=data,
+                                          ssl=self.verify_ssl) as r:
+                        if r.status != 204:
+                            msg = await r.text()
+                            raise Exception(f'{msg} (error code: {r.status})')
+            except Exception as e:
+                msg = str(e) or type(e).__name__
+                logging.error(f'failed to set asset kind: {msg}')
 
         return asset_id, name
 
