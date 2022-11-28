@@ -271,8 +271,8 @@ class Agent:
                 async with ClientSession(
                         headers=self._json_headers) as session:
                     async with session.patch(url,
-                                          json=data,
-                                          ssl=self.verify_ssl) as r:
+                                             json=data,
+                                             ssl=self.verify_ssl) as r:
                         if r.status != 204:
                             msg = await r.text()
                             raise Exception(f'{msg} (error code: {r.status})')
