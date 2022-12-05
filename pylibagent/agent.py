@@ -55,9 +55,9 @@ class Agent:
             logging.error(f'invalid agent version: `{version}`')
             exit(1)
 
-        self.asset_id_file: str = os.getenv('ASSET_ID_FILE', None)
+        self.asset_id_file: str = os.getenv('ASSET_ID', None)
         if self.asset_id_file is None:
-            logging.error('missing environment variable `ASSET_ID_FILE`')
+            logging.error('missing environment variable `ASSET_ID`')
             exit(1)
 
         token = os.getenv('TOKEN', None)
@@ -73,7 +73,10 @@ class Agent:
         self.asset_id: Optional[int] = None
         self.api_uri: str = os.getenv('API_URI', 'https://api.infrasonar.com')
         self.verify_ssl = _convert_verify_ssl(os.getenv('VERIFY_SSL', '1'))
-        self._read_json()
+        if str.isdigit(self.asset_id_file):
+            self.asset_id = int(self.asset_id_file)
+        else:
+            self._read_json()
 
     async def announce(self, asset_name: Optional[str] = None,
                        asset_kind: Optional[str] = None):

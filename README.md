@@ -16,7 +16,7 @@ pip install pylibagent
 Variable                    | Default                       | Description
 ----------------------------|-------------------------------|-------------------
 `TOKEN`                     | _required_                    | Token to connect to.
-`ASSET_ID_FILE`             | _required_                    | File where the Agent asset Id is stored _(e.g `/var/infrasonar/asset_id.json`)_.
+`ASSET_ID`                  | _required_                    | Asset Id or file location where the Agent asset Id is stored _(e.g `123` or `/var/infrasonar/asset_id.json`)_.
 `API_URI`                   | https://api.infrasonar.com    | InfraSonar API.
 `VERIFY_SSL`                | `1`                           | Verify SSL certificate, 0 _(=disabled)_ or 1 _(=enabled)_.
 `LOG_LEVEL`                 | `warning`                     | Log level _(error, warning, info, debug)_.
