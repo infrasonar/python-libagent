@@ -66,9 +66,9 @@ class Agent:
             exit(1)
 
         self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._get_headers = {'Authorization': f'Bearer {token}'}
+        self._headers = {'Authorization': f'Bearer {token}'}
         self._json_headers = {'Content-Type': 'application/json'}
-        self._json_headers.update(self._get_headers)
+        self._json_headers.update(self._headers)
 
         self.asset_id: Optional[int] = None
         self.api_uri: str = os.getenv('API_URI', 'https://api.infrasonar.com')
@@ -93,7 +93,7 @@ class Agent:
                 return
 
             url = _join(self.api_uri, f'asset/{self.asset_id}')
-            async with ClientSession(headers=self._get_headers) as session:
+            async with ClientSession(headers=self._headers) as session:
                 async with session.get(
                         url,
                         params={'field': 'name'},
@@ -235,7 +235,7 @@ class Agent:
     async def _create_asset(self, asset_name: Optional[str] = None,
                             asset_kind: Optional[str] = None) -> int:
         url = _join(self.api_uri, 'container/id')
-        async with ClientSession(headers=self._get_headers) as session:
+        async with ClientSession(headers=self._headers) as session:
             async with session.get(url, ssl=self.verify_ssl) as r:
                 if r.status != 200:
                     msg = await r.text()
@@ -258,7 +258,7 @@ class Agent:
 
         try:
             url = _join(self.api_uri, f'asset/{asset_id}/collector/{self.key}')
-            async with ClientSession(headers=self._json_headers) as session:
+            async with ClientSession(headers=self._headers) as session:
                 async with session.post(url, ssl=self.verify_ssl) as r:
                     if r.status != 204:
                         msg = await r.text()
