@@ -96,7 +96,7 @@ class Agent:
             async with ClientSession(headers=self._headers) as session:
                 async with session.get(
                         url,
-                        params={'field': 'name'},
+                        params={'fields': 'name', 'collectors': 'key'},
                         ssl=self.verify_ssl) as r:
                     if r.status != 200:
                         msg = await r.text()
@@ -104,6 +104,27 @@ class Agent:
 
                     resp = await r.json()
                     name = resp["name"]
+                    collectors = resp["collectors"]
+
+            for collector in collectors:
+                if collector['key'] == self.key:
+                    break
+            else:
+                # The collector is not assigned yet
+                url = _join(
+                    self.api_uri,
+                    f'asset/{self.asset_id}/collector/{self.key}')
+                try:
+                    async with ClientSession(headers=self._headers) as session:
+                        async with session.post(url, ssl=self.verify_ssl) as r:
+                            if r.status != 204:
+                                msg = await r.text()
+                                raise Exception(
+                                    f'{msg} (error code: {r.status})')
+                except Exception as e:
+                    msg = str(e) or type(e).__name__
+                    logging.error(f'failed to assign collector: {msg}')
+
             logging.info(f'announced agent {name} (Id: {self.asset_id})')
             return
 
