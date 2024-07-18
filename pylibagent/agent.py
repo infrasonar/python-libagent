@@ -216,6 +216,10 @@ class Agent:
             pass
 
     async def _check_loop(self, check):
+        if check.interval == 0:
+            logging.error(f'check `{check.key}` is disabled')
+            return
+
         ts = time.time()
         ts_next = int(ts + random.random() * check.interval) + 1
         timeout = check.interval * 0.8
