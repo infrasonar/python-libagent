@@ -7,7 +7,7 @@ import re
 import signal
 import socket
 import time
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Tuple, Type
 from aiohttp import ClientSession
 from setproctitle import setproctitle
 from .logger import setup_logger
@@ -55,8 +55,8 @@ class Agent:
             logging.error(f'invalid agent version: `{version}`')
             exit(1)
 
-        self.asset_id_file: str = os.getenv('ASSET_ID', None)
-        if self.asset_id_file is None:
+        asset_id_file = os.getenv('ASSET_ID', None)
+        if asset_id_file is None:
             logging.error('missing environment variable `ASSET_ID`')
             exit(1)
 
@@ -71,6 +71,7 @@ class Agent:
         self._json_headers.update(self._headers)
 
         self.asset_id: Optional[int] = None
+        self.asset_id_file: str = asset_id_file
         self.api_uri: str = os.getenv('API_URI', 'https://api.infrasonar.com')
         self.verify_ssl = _convert_verify_ssl(os.getenv('VERIFY_SSL', '1'))
         if str.isdigit(self.asset_id_file):
@@ -87,7 +88,7 @@ class Agent:
         try:
             if self.asset_id is None:
                 self.asset_id, name =\
-                     await self._create_asset(asset_name, asset_kind)
+                    await self._create_asset(asset_name, asset_kind)
                 self._dump_json()
                 logging.info(f'created agent {name} (Id: {self.asset_id})')
                 return
@@ -95,9 +96,10 @@ class Agent:
             url = _join(self.api_uri, f'asset/{self.asset_id}')
             async with ClientSession(headers=self._headers) as session:
                 async with session.get(
-                        url,
-                        params={'fields': 'name', 'collectors': 'key'},
-                        ssl=self.verify_ssl) as r:
+                    url,
+                    params={'fields': 'name', 'collectors': 'key'},
+                    ssl=self.verify_ssl    # type: ignore
+                ) as r:
                     if r.status != 200:
                         msg = await r.text()
                         raise Exception(f'{msg} (error code: {r.status})')
@@ -116,7 +118,10 @@ class Agent:
                     f'asset/{self.asset_id}/collector/{self.key}')
                 try:
                     async with ClientSession(headers=self._headers) as session:
-                        async with session.post(url, ssl=self.verify_ssl) as r:
+                        async with session.post(
+                            url,
+                            ssl=self.verify_ssl  # type: ignore
+                        ) as r:
                             if r.status != 204:
                                 msg = await r.text()
                                 raise Exception(
@@ -133,7 +138,7 @@ class Agent:
             logging.error(f'announce failed: {msg}')
             exit(1)
 
-    async def send_data(self, check_key: str, data: dict,
+    async def send_data(self, check_key: str, check_data: dict,
                         timestamp: Optional[int] = None,
                         runtime: Optional[float] = None):
         # The latter strings shouldn't start with a slash. If they start with a
@@ -150,7 +155,7 @@ class Agent:
         timestamp = timestamp or int(time.time())
         data = {
             "version": self.version,
-            "data": data,
+            "data": check_data,
             "timestamp": timestamp,
         }
 
@@ -162,7 +167,7 @@ class Agent:
                 async with session.post(
                     url,
                     json=data,
-                    ssl=self.verify_ssl
+                    ssl=self.verify_ssl  # type: ignore
                 ) as r:
                     if r.status != 204:
                         msg = await r.text()
@@ -173,9 +178,10 @@ class Agent:
             raise SendDataException(
                 f'failed to send data ({check_key}): {msg} (url: {url})')
 
-    def start(self, checks: Iterable[CheckBase],
+    def start(self, checks: Iterable[Type[CheckBase]],
               asset_name: Optional[str] = None,
-              asset_kind: Optional[str] = None):
+              asset_kind: Optional[str] = None,
+              loop: Optional[asyncio.AbstractEventLoop] = None):
         """Start the agent demonized.
 
         The `asset_name` argument is only used on the accounce when the asset
@@ -185,13 +191,17 @@ class Agent:
         is new and must be created. If not given, the asset will be created
         with the default `Asset` kind.
 
+        The `loop` argument can be used to run the client on a specific event
+        loop. If this argument is not used, a new event loop will be
+        created. Defaults to `None`.
+
         Argument `checks` must be an iterable containing subclasses of
         CheckBase. (the classes, not instances of the class)
         """
         signal.signal(signal.SIGINT, self._stop)
         signal.signal(signal.SIGTERM, self._stop)
 
-        self._loop = asyncio.get_event_loop()
+        self._loop = loop if loop else asyncio.new_event_loop()
         try:
             self._loop.run_until_complete(
                 self._start(checks, asset_name, asset_kind))
@@ -205,17 +215,17 @@ class Agent:
         for task in asyncio.all_tasks():
             task.cancel()
 
-    async def _start(self, checks: Iterable[CheckBase],
+    async def _start(self, checks: Iterable[Type[CheckBase]],
                      asset_name: Optional[str] = None,
                      asset_kind: Optional[str] = None):
         await self.announce(asset_name, asset_kind)
-        checks = [self._check_loop(c) for c in checks]
+        futs = [self._check_loop(c) for c in checks]
         try:
-            await asyncio.wait(checks)
+            await asyncio.wait(futs)  # type: ignore
         except asyncio.exceptions.CancelledError:
             pass
 
-    async def _check_loop(self, check):
+    async def _check_loop(self, check: Type[CheckBase]):
         if check.interval == 0:
             logging.error(f'check `{check.key}` is disabled')
             return
@@ -258,10 +268,14 @@ class Agent:
                 ts_next += check.interval
 
     async def _create_asset(self, asset_name: Optional[str] = None,
-                            asset_kind: Optional[str] = None) -> int:
+                            asset_kind: Optional[str] = None
+                            ) -> Tuple[int, str]:
         url = _join(self.api_uri, 'container/id')
         async with ClientSession(headers=self._headers) as session:
-            async with session.get(url, ssl=self.verify_ssl) as r:
+            async with session.get(
+                url,
+                ssl=self.verify_ssl   # type: ignore
+            ) as r:
                 if r.status != 200:
                     msg = await r.text()
                     raise Exception(f'{msg} (error code: {r.status})')
@@ -273,7 +287,11 @@ class Agent:
         name = _fqdn() if asset_name is None else asset_name
         data = {"name": name}
         async with ClientSession(headers=self._json_headers) as session:
-            async with session.post(url, json=data, ssl=self.verify_ssl) as r:
+            async with session.post(
+                url,
+                json=data,
+                ssl=self.verify_ssl  # type: ignore
+            ) as r:
                 if r.status != 201:
                     msg = await r.text()
                     raise Exception(f'{msg} (error code: {r.status})')
@@ -284,7 +302,10 @@ class Agent:
         try:
             url = _join(self.api_uri, f'asset/{asset_id}/collector/{self.key}')
             async with ClientSession(headers=self._headers) as session:
-                async with session.post(url, ssl=self.verify_ssl) as r:
+                async with session.post(
+                    url,
+                    ssl=self.verify_ssl  # type: ignore
+                ) as r:
                     if r.status != 204:
                         msg = await r.text()
                         raise Exception(f'{msg} (error code: {r.status})')
@@ -298,9 +319,11 @@ class Agent:
                 url = _join(self.api_uri, f'asset/{asset_id}/kind')
                 async with ClientSession(
                         headers=self._json_headers) as session:
-                    async with session.patch(url,
-                                             json=data,
-                                             ssl=self.verify_ssl) as r:
+                    async with session.patch(
+                        url,
+                        json=data,
+                        ssl=self.verify_ssl  # type: ignore
+                    ) as r:
                         if r.status != 204:
                             msg = await r.text()
                             raise Exception(f'{msg} (error code: {r.status})')
