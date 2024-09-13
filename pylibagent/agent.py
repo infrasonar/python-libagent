@@ -221,9 +221,10 @@ class Agent:
         await self.announce(asset_name, asset_kind)
         futs = [self._check_loop(c) for c in checks]
         try:
-            await asyncio.wait(futs)  # type: ignore
+            await asyncio.gather(*futs)
         except asyncio.exceptions.CancelledError:
             pass
+
 
     async def _check_loop(self, check: Type[CheckBase]):
         if check.interval == 0:
