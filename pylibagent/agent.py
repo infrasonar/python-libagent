@@ -214,7 +214,6 @@ class Agent:
             f'signal \'{signame}\' received, stop {self.key} agent')
         for task in asyncio.all_tasks():
             task.cancel()
-        raise Exception
 
     async def _start(self, checks: Iterable[Type[CheckBase]],
                      asset_name: Optional[str] = None,
