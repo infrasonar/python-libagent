@@ -180,7 +180,8 @@ class Agent:
 
     def start(self, checks: Iterable[Type[CheckBase]],
               asset_name: Optional[str] = None,
-              asset_kind: Optional[str] = None):
+              asset_kind: Optional[str] = None,
+              loop: Optional[asyncio.AbstractEventLoop] = None):
         """Start the agent demonized.
 
         The `asset_name` argument is only used on the accounce when the asset
@@ -190,13 +191,17 @@ class Agent:
         is new and must be created. If not given, the asset will be created
         with the default `Asset` kind.
 
+        The `loop` argument can be used to run the client on a specific event
+        loop. If this argument is not used, a new event loop will be
+        created. Defaults to `None`.
+
         Argument `checks` must be an iterable containing subclasses of
         CheckBase. (the classes, not instances of the class)
         """
         signal.signal(signal.SIGINT, self._stop)
         signal.signal(signal.SIGTERM, self._stop)
 
-        self._loop = asyncio.get_event_loop()
+        self._loop = loop if loop else asyncio.new_event_loop()
         try:
             self._loop.run_until_complete(
                 self._start(checks, asset_name, asset_kind))
