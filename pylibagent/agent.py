@@ -225,7 +225,6 @@ class Agent:
         except asyncio.exceptions.CancelledError:
             pass
 
-
     async def _check_loop(self, check: Type[CheckBase]):
         if check.interval == 0:
             logging.error(f'check `{check.key}` is disabled')
