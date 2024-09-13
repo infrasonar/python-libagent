@@ -7,7 +7,7 @@ import re
 import signal
 import socket
 import time
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Tuple
 from aiohttp import ClientSession
 from setproctitle import setproctitle
 from .logger import setup_logger
@@ -55,8 +55,8 @@ class Agent:
             logging.error(f'invalid agent version: `{version}`')
             exit(1)
 
-        self.asset_id_file: str = os.getenv('ASSET_ID', None)
-        if self.asset_id_file is None:
+        asset_id_file = os.getenv('ASSET_ID', None)
+        if asset_id_file is None:
             logging.error('missing environment variable `ASSET_ID`')
             exit(1)
 
@@ -71,6 +71,7 @@ class Agent:
         self._json_headers.update(self._headers)
 
         self.asset_id: Optional[int] = None
+        self.asset_id_file: str = asset_id_file
         self.api_uri: str = os.getenv('API_URI', 'https://api.infrasonar.com')
         self.verify_ssl = _convert_verify_ssl(os.getenv('VERIFY_SSL', '1'))
         if str.isdigit(self.asset_id_file):
@@ -87,7 +88,7 @@ class Agent:
         try:
             if self.asset_id is None:
                 self.asset_id, name =\
-                     await self._create_asset(asset_name, asset_kind)
+                    await self._create_asset(asset_name, asset_kind)
                 self._dump_json()
                 logging.info(f'created agent {name} (Id: {self.asset_id})')
                 return
@@ -133,7 +134,7 @@ class Agent:
             logging.error(f'announce failed: {msg}')
             exit(1)
 
-    async def send_data(self, check_key: str, data: dict,
+    async def send_data(self, check_key: str, check_data: dict,
                         timestamp: Optional[int] = None,
                         runtime: Optional[float] = None):
         # The latter strings shouldn't start with a slash. If they start with a
@@ -150,7 +151,7 @@ class Agent:
         timestamp = timestamp or int(time.time())
         data = {
             "version": self.version,
-            "data": data,
+            "data": check_data,
             "timestamp": timestamp,
         }
 
@@ -209,9 +210,9 @@ class Agent:
                      asset_name: Optional[str] = None,
                      asset_kind: Optional[str] = None):
         await self.announce(asset_name, asset_kind)
-        checks = [self._check_loop(c) for c in checks]
+        futs = [self._check_loop(c) for c in checks]
         try:
-            await asyncio.wait(checks)
+            await asyncio.wait(futs)
         except asyncio.exceptions.CancelledError:
             pass
 
@@ -258,7 +259,8 @@ class Agent:
                 ts_next += check.interval
 
     async def _create_asset(self, asset_name: Optional[str] = None,
-                            asset_kind: Optional[str] = None) -> int:
+                            asset_kind: Optional[str] = None
+                            ) -> Tuple[int, str]:
         url = _join(self.api_uri, 'container/id')
         async with ClientSession(headers=self._headers) as session:
             async with session.get(url, ssl=self.verify_ssl) as r:
