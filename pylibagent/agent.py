@@ -205,7 +205,7 @@ class Agent:
         try:
             self._loop.run_until_complete(
                 self._start(checks, asset_name, asset_kind))
-        except Exception:
+        finally:
             self._loop.run_until_complete(self._loop.shutdown_asyncgens())
             self._loop.close()
 
