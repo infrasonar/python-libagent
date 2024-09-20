@@ -18,12 +18,6 @@ class SendDataException(Exception):
     pass
 
 
-def _convert_verify_ssl(val):
-    if val is None or val.lower() in ['true', '1', 'y', 'yes']:
-        return None  # None for default SSL check
-    return False
-
-
 def _fqdn():
     fqdn = socket.getaddrinfo(
         socket.gethostname(),
@@ -73,7 +67,7 @@ class Agent:
         self.asset_id: Optional[int] = None
         self.asset_id_file: str = asset_id_file
         self.api_uri: str = os.getenv('API_URI', 'https://api.infrasonar.com')
-        self.verify_ssl = _convert_verify_ssl(os.getenv('VERIFY_SSL', '1'))
+        self.verify_ssl: bool = bool(int(os.getenv('VERIFY_SSL', '1')))
         if str.isdigit(self.asset_id_file):
             self.asset_id = int(self.asset_id_file)
         else:
@@ -98,7 +92,7 @@ class Agent:
                 async with session.get(
                     url,
                     params={'fields': 'name', 'collectors': 'key'},
-                    ssl=self.verify_ssl    # type: ignore
+                    ssl=self.verify_ssl
                 ) as r:
                     if r.status != 200:
                         msg = await r.text()
@@ -120,7 +114,7 @@ class Agent:
                     async with ClientSession(headers=self._headers) as session:
                         async with session.post(
                             url,
-                            ssl=self.verify_ssl  # type: ignore
+                            ssl=self.verify_ssl
                         ) as r:
                             if r.status != 204:
                                 msg = await r.text()
@@ -167,7 +161,7 @@ class Agent:
                 async with session.post(
                     url,
                     json=data,
-                    ssl=self.verify_ssl  # type: ignore
+                    ssl=self.verify_ssl
                 ) as r:
                     if r.status != 204:
                         msg = await r.text()
@@ -275,7 +269,7 @@ class Agent:
         async with ClientSession(headers=self._headers) as session:
             async with session.get(
                 url,
-                ssl=self.verify_ssl   # type: ignore
+                ssl=self.verify_ssl
             ) as r:
                 if r.status != 200:
                     msg = await r.text()
@@ -291,7 +285,7 @@ class Agent:
             async with session.post(
                 url,
                 json=data,
-                ssl=self.verify_ssl  # type: ignore
+                ssl=self.verify_ssl
             ) as r:
                 if r.status != 201:
                     msg = await r.text()
@@ -305,7 +299,7 @@ class Agent:
             async with ClientSession(headers=self._headers) as session:
                 async with session.post(
                     url,
-                    ssl=self.verify_ssl  # type: ignore
+                    ssl=self.verify_ssl
                 ) as r:
                     if r.status != 204:
                         msg = await r.text()
@@ -323,7 +317,7 @@ class Agent:
                     async with session.patch(
                         url,
                         json=data,
-                        ssl=self.verify_ssl  # type: ignore
+                        ssl=self.verify_ssl
                     ) as r:
                         if r.status != 204:
                             msg = await r.text()
