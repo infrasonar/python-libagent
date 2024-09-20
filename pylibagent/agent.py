@@ -20,7 +20,7 @@ class SendDataException(Exception):
 
 def _convert_verify_ssl(val):
     if val is None or val.lower() in ['true', '1', 'y', 'yes']:
-        return None  # None for default SSL check
+        return True
     return False
 
 
@@ -98,7 +98,7 @@ class Agent:
                 async with session.get(
                     url,
                     params={'fields': 'name', 'collectors': 'key'},
-                    ssl=self.verify_ssl    # type: ignore
+                    ssl=self.verify_ssl
                 ) as r:
                     if r.status != 200:
                         msg = await r.text()
@@ -120,7 +120,7 @@ class Agent:
                     async with ClientSession(headers=self._headers) as session:
                         async with session.post(
                             url,
-                            ssl=self.verify_ssl  # type: ignore
+                            ssl=self.verify_ssl
                         ) as r:
                             if r.status != 204:
                                 msg = await r.text()
@@ -167,7 +167,7 @@ class Agent:
                 async with session.post(
                     url,
                     json=data,
-                    ssl=self.verify_ssl  # type: ignore
+                    ssl=self.verify_ssl
                 ) as r:
                     if r.status != 204:
                         msg = await r.text()
@@ -274,7 +274,7 @@ class Agent:
         async with ClientSession(headers=self._headers) as session:
             async with session.get(
                 url,
-                ssl=self.verify_ssl   # type: ignore
+                ssl=self.verify_ssl
             ) as r:
                 if r.status != 200:
                     msg = await r.text()
@@ -290,7 +290,7 @@ class Agent:
             async with session.post(
                 url,
                 json=data,
-                ssl=self.verify_ssl  # type: ignore
+                ssl=self.verify_ssl
             ) as r:
                 if r.status != 201:
                     msg = await r.text()
@@ -304,7 +304,7 @@ class Agent:
             async with ClientSession(headers=self._headers) as session:
                 async with session.post(
                     url,
-                    ssl=self.verify_ssl  # type: ignore
+                    ssl=self.verify_ssl
                 ) as r:
                     if r.status != 204:
                         msg = await r.text()
@@ -322,7 +322,7 @@ class Agent:
                     async with session.patch(
                         url,
                         json=data,
-                        ssl=self.verify_ssl  # type: ignore
+                        ssl=self.verify_ssl
                     ) as r:
                         if r.status != 204:
                             msg = await r.text()

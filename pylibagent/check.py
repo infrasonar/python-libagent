@@ -20,6 +20,7 @@ class CheckBase(abc.ABC):
             raise TypeError('interval must be type int')
         return super().__init_subclass__(**kwargs)
 
-    @abc.abstractclassmethod  # type: ignore
+    @classmethod
+    @abc.abstractmethod
     async def run(cls) -> Dict[str, List[Dict[str, Any]]]:
         ...
