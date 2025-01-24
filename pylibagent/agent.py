@@ -42,8 +42,6 @@ def _is_valid_version(version):
     return isinstance(version, str) and bool(check.match(version))
 
 
-
-
 class Agent:
 
     def __init__(self, key: str, version: str):
