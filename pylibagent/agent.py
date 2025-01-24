@@ -42,6 +42,8 @@ def _is_valid_version(version):
     return isinstance(version, str) and bool(check.match(version))
 
 
+
+
 class Agent:
 
     def __init__(self, key: str, version: str):
@@ -65,10 +67,10 @@ class Agent:
             logging.error('missing environment variable `TOKEN`')
             exit(1)
 
+        self.headers = {'Authorization': f'Bearer {token}'}
         self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._headers = {'Authorization': f'Bearer {token}'}
         self._json_headers = {'Content-Type': 'application/json'}
-        self._json_headers.update(self._headers)
+        self._json_headers.update(self.headers)
 
         self.asset_id: Optional[int] = None
         self.asset_id_file: str = asset_id_file
@@ -78,6 +80,8 @@ class Agent:
             self.asset_id = int(self.asset_id_file)
         else:
             self._read_json()
+
+        self._disabled_checks: DisabledChecks = DisabledChecks()
 
     async def announce(self, asset_name: Optional[str] = None,
                        asset_kind: Optional[str] = None):
@@ -94,7 +98,7 @@ class Agent:
                 return
 
             url = _join(self.api_uri, f'asset/{self.asset_id}')
-            async with ClientSession(headers=self._headers) as session:
+            async with ClientSession(headers=self.headers) as session:
                 async with session.get(
                     url,
                     params={'fields': 'name', 'collectors': 'key'},
@@ -117,7 +121,7 @@ class Agent:
                     self.api_uri,
                     f'asset/{self.asset_id}/collector/{self.key}')
                 try:
-                    async with ClientSession(headers=self._headers) as session:
+                    async with ClientSession(headers=self.headers) as session:
                         async with session.post(
                             url,
                             ssl=self.verify_ssl
@@ -251,9 +255,12 @@ class Agent:
             ts = ts_next
 
             try:
-                check_data = \
-                    await asyncio.wait_for(check.run(), timeout=timeout)
-                await self.send_data(check.key, check_data)
+                if await self._disabled_checks.is_disabled(self, check.key):
+                    logging.debug(f'check {check.key} is disabled')
+                else:
+                    check_data = \
+                        await asyncio.wait_for(check.run(), timeout=timeout)
+                    await self.send_data(check.key, check_data)
             except asyncio.TimeoutError:
                 logging.error(f'check error ({check.key}): timed out')
             except SendDataException as e:
@@ -271,7 +278,7 @@ class Agent:
                             asset_kind: Optional[str] = None
                             ) -> Tuple[int, str]:
         url = _join(self.api_uri, 'container/id')
-        async with ClientSession(headers=self._headers) as session:
+        async with ClientSession(headers=self.headers) as session:
             async with session.get(
                 url,
                 ssl=self.verify_ssl
@@ -301,7 +308,7 @@ class Agent:
 
         try:
             url = _join(self.api_uri, f'asset/{asset_id}/collector/{self.key}')
-            async with ClientSession(headers=self._headers) as session:
+            async with ClientSession(headers=self.headers) as session:
                 async with session.post(
                     url,
                     ssl=self.verify_ssl
@@ -368,3 +375,42 @@ class Agent:
             logging.error(
                 f"failed to write file: {self.asset_id_file} ({msg})")
             exit(1)
+
+
+class DisabledChecks:
+    def __init__(self):
+        self._list = []
+        self._age: int = 0
+        self._max_age: int = int(os.getenv('DISABLED_CHECKS_CACHE_AGE', '900'))
+        self._lock: asyncio.Lock = asyncio.Lock()
+
+    async def is_disabled(self, agent: Agent, check_key: str) -> bool:
+        async with self._lock:
+            if time.time() - self._age > self._max_age:
+                await self._update_list(agent)
+            return check_key in self._list
+
+    async def _update_list(self, agent: Agent):
+        self._list = []
+        try:
+            url = _join(agent.api_uri, f'asset/{agent.asset_id}')
+            async with ClientSession(headers=agent.headers) as session:
+                async with session.get(
+                    url,
+                    params={'fields': 'disabledChecks'},
+                    ssl=agent.verify_ssl
+                ) as r:
+                    if r.status != 200:
+                        msg = await r.text()
+                        raise Exception(f'{msg} (error code: {r.status})')
+                    resp = await r.json()
+                    disabledChecks = resp["disabledChecks"]
+        except Exception as e:
+            logging.error(e)
+            return
+
+        for dc in disabledChecks:
+            if dc['collector'] == agent.key:
+                self._list.append(dc['check'])
+
+        self._age = int(time.time())
