@@ -12,6 +12,7 @@ from aiohttp import ClientSession
 from setproctitle import setproctitle
 from .logger import setup_logger
 from .check import CheckBase
+from .exceptions import CheckException
 
 
 class SendDataException(Exception):
@@ -140,7 +141,10 @@ class Agent:
             logging.error(f'announce failed: {msg}')
             exit(1)
 
-    async def send_data(self, check_key: str, check_data: dict,
+    async def send_data(self,
+                        check_key: str,
+                        check_data: Optional[dict] = None,
+                        check_error: Optional[CheckException] = None,
                         timestamp: Optional[int] = None,
                         runtime: Optional[float] = None):
         # The latter strings shouldn't start with a slash. If they start with a
@@ -157,9 +161,14 @@ class Agent:
         timestamp = timestamp or int(time.time())
         data = {
             "version": self.version,
-            "data": check_data,
             "timestamp": timestamp,
         }
+
+        if check_data is not None:
+            data['data'] = check_data
+
+        if check_error is not None:
+            data['error'] = check_error.to_dict()
 
         if runtime is not None:
             data["runtime"] = runtime
@@ -256,11 +265,24 @@ class Agent:
                 if await self._disabled_checks.is_disabled(self, check.key):
                     logging.debug(f'check {check.key} is disabled')
                 else:
-                    check_data = \
-                        await asyncio.wait_for(check.run(), timeout=timeout)
-                    await self.send_data(check.key, check_data)
-            except asyncio.TimeoutError:
-                logging.error(f'check error ({check.key}): timed out')
+                    check_data = None
+                    check_error = None
+                    try:
+                        check_data = await asyncio.wait_for(
+                            check.run(),
+                            timeout=timeout)
+                    except asyncio.TimeoutError:
+                        check_error = CheckException('timed out')
+                    except CheckException as e:
+                        check_error = e
+                    except Exception as e:
+                        msg = str(e) or type(e).__name__
+                        check_error = CheckException(msg)
+
+                    await self.send_data(check.key, check_data, check_error)
+                    if check_error is not None:
+                        raise check_error
+
             except SendDataException as e:
                 logging.error(str(e))
             except Exception as e:
