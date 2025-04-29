@@ -92,3 +92,9 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+
+### Known issues
+
+It might happen that a _RuntimeError, "can't create new thread"_ is raised when using the docker agent inside docker.
+To solve this issue, add `privileged: true` to your service in docker compose or start docker with `--privileged`.
